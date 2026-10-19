@@ -14,13 +14,13 @@ n = par.threads.values
 
 # Speedup
 plt.figure()
-plt.plot(n, par.speedup, "o-", label="msura")
+plt.plot(n, par.speedup, "o-", label="mesura")
 plt.plot(n, n, "k--", label="ideal")
 plt.xlabel("Threads")
 plt.ylabel("Speedup vs sequencial")
 plt.grid(True)
 plt.legend()
-plt.savefig("report/figs/speedup.pdf", bbox_inches="tight")
+plt.savefig("report/figs/speedup.png", bbox_inches="tight")
 
 # Eficiencia
 plt.figure()
@@ -30,7 +30,7 @@ plt.xlabel("Threads")
 plt.ylabel("Eficiència")
 plt.ylim(0, 1.1)
 plt.grid(True)
-plt.savefig("report/figs/eficiencia.pdf", bbox_inches="tight")
+plt.savefig("report/figs/eficiencia.png", bbox_inches="tight")
 
 # Temps
 plt.figure()
@@ -38,4 +38,4 @@ plt.plot(n, par.time, "o-")
 plt.xlabel("Threads")
 plt.ylabel("Temps execució (s)")
 plt.grid(True)
-plt.savefig("report/figs/temps.pdf", bbox_inches="tight")
+plt.savefig("report/figs/temps.png", bbox_inches="tight")
