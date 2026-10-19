@@ -84,6 +84,8 @@ void train_neural_net() {
         ranpat[p] = p;
 
     // Gradient Descent
+    struct timeval now;
+    gettimeofday(&now, 0);
     for (int it = 0; it < num_epochs; it++) {
         float loss = 0;
         // Train patterns randomly
@@ -111,6 +113,8 @@ void train_neural_net() {
         printf("Epoch %d Loss: %f\n", it, loss/num_training_patterns);
         if (debug == 1) getchar();
     }
+    double elapsed = elapsedT(now);
+    printf("TRAIN_TIME=%f", elapsed);
     freeInput(num_training_patterns, input);
 }
 
