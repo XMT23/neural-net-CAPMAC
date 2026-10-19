@@ -18,6 +18,6 @@ make BUILD=$BUILD || exit 1
 # TODO Veure documentació de perf stat:
 # https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/8/html/monitoring_and_managing_system_status_and_performance/counting-events-during-process-execution-with-perf-stat_monitoring-and-managing-system-status-and-performance
 # per millorar i exprimir les seves capacitats
-perf stat ./exec configuration/configfile.txt
+perf stat ./$EXEC configuration/configfile.txt
 
 make clean
