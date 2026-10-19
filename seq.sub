@@ -2,6 +2,8 @@
 #SBATCH -N 1 # number of nodes
 #SBATCH --exclusive
 #SBATCH --partition=test.q
+#SBATCH --output=results/output-%j.out
+#SBATCH --error=results/output-%j.err
 
 module add gcc/13.2.1
 
