@@ -1,0 +1,19 @@
+#!/bin/bash
+#SBATCH -N 1 # number of nodes
+#SBATCH --exclusive
+#SBATCH --partition=nodo.q
+#SBATCH --output=metrics/output-%j.out
+#SBATCH --error=metrics/output-%j.err
+
+module add gcc/13.2.1
+
+BUILD=release
+TARGET=neural_net
+EXEC=build/$BUILD-par/$TARGET
+
+make clean
+make BUILD=$BUILD || exit 1
+
+perf stat ./$EXEC configuration/configfile.txt
+
+make clean
