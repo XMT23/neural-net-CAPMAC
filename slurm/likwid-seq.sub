@@ -1,0 +1,21 @@
+#!/bin/bash
+#SBATCH -N 1 # number of nodes
+#SBATCH --exclusive
+#SBATCH --partition=nodo.q
+#SBATCH --output=results/output-%j.out
+#SBATCH --error=results/output-%j.err
+
+module add gcc/13.2.1
+module load likwid/5.2.2
+
+BUILD=release
+TARGET=neural_net
+EXEC=build/$BUILD-par/$TARGET
+
+# gcc -Ofast main.c common/common.c configuration/config.c layer/layer.c randomizer/randomizer.c initialize/initialize.c training/training.c -o exec -lm 
+make clean
+make BUILD=$BUILD PAR=0 || exit 1
+
+likwid-perfctr -f -C 0-11 -g FLOPS_SP ./$EXEC configuration/configfile.txt
+
+make clean
