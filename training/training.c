@@ -231,6 +231,10 @@ void back_prop(int p) {
     //  Hi ha d'haver una solució millor i més elegant i potser aquesta no contempla segons quines
     //  situacion concretes. Tot i així, en general, funciona correctament.
     //
+    //  NOTE: Hi havia potser una solució més senzilla, declarar els accessos a dactv[k]
+    //  // com atomic. No obstant, s'executa tantes vegades aquesta secció que interessava no 
+    //  // "seqüencialitzar-la".
+    //
     // TODO: Fer tests i proves per comprovar que, efectivament, aquesta és una solució vàlida!!
     
     #pragma omp parallel
