@@ -9,7 +9,7 @@ module add gcc/13.2.1
 
 BUILD=release
 TARGET=neural_net
-EXEC=build/$BUILD-par/$TARGET
+EXEC=build/$BUILD-seq/$TARGET
 
 # gcc -Ofast main.c common/common.c configuration/config.c layer/layer.c randomizer/randomizer.c initialize/initialize.c training/training.c -o exec -lm 
 make clean
