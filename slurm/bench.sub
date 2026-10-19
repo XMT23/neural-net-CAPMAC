@@ -1,0 +1,10 @@
+#!/bin/bash
+#SBATCH -N 1
+#SBATCH --exclusive
+#SBATCH --partition=nodo.q
+#SBATCH --output=results/bench-%j.out
+#SBATCH --error=results/bench-%j.err
+
+module add gcc/13.2.1
+
+scripts/bench.sh
