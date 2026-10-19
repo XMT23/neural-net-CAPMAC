@@ -18,3 +18,5 @@ make BUILD=$BUILD || exit 1
 
 # perf stat ./exec configuration/configfile.txt
 ./$EXEC configuration/configfile.txt
+
+make clean
