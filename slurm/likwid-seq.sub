@@ -16,6 +16,6 @@ EXEC=build/$BUILD-seq/$TARGET
 make clean
 make BUILD=$BUILD PAR=0 || exit 1
 
-likwid-perfctr -f -C 0-11 -g FLOPS_SP ./$EXEC configuration/configfile.txt
+likwid-perfctr -f -C 0 -g FLOPS_SP ./$EXEC configuration/configfile.txt
 
 make clean
