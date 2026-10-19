@@ -5,7 +5,14 @@
 
 module add gcc/13.2.1
 
-gcc -Ofast main.c common/common.c configuration/config.c layer/layer.c randomizer/randomizer.c initialize/initialize.c training/training.c -o exec -lm 
+BUILD=release # Es pot posar en 'debug'
+TARGET=neural_net
+EXEC=build/$BUILD/$TARGET
+
+
+# gcc -Ofast main.c common/common.c configuration/config.c layer/layer.c randomizer/randomizer.c initialize/initialize.c training/training.c -o exec -lm 
+make clean
+make BUILD=$BUILD || exit 1
 
 ## perf stat ./exec configuration/configfile.txt
-./exec configuration/configfile.txt
+./$EXEC configuration/configfile.txt
