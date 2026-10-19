@@ -7,10 +7,9 @@
 
 module add gcc/13.2.1
 
-BUILD=release # Es pot posar en 'debug'
+BUILD=release
 TARGET=neural_net
 EXEC=build/$BUILD-par/$TARGET
-
 
 # gcc -Ofast main.c common/common.c configuration/config.c layer/layer.c randomizer/randomizer.c initialize/initialize.c training/training.c -o exec -lm 
 make clean
