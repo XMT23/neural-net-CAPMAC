@@ -5,19 +5,31 @@ SRC = $(shell find . -name '*.c' -not -path './build/*' | sed 's|^\./||')
 INC = $(addprefix -I,$(sort $(dir $(SRC))))
 
 # release default. "make debug" for debug
+PAR				?= 1
 BUILD     ?= release
-BUILD_DIR  = build/$(BUILD)
 OBJ        = $(SRC:%.c=$(BUILD_DIR)/%.o)
 DEP        = $(OBJ:.o=.d)
 
 ifeq ($(BUILD),debug)
-    CFLAGS = -O0 -g -fopenmp -Wall -Wextra -DDEBUG
+    CFLAGS = -O0 -g -Wall -Wextra -DDEBUG
 else
-    CFLAGS = -Ofast -fopenmp -Wall
+    CFLAGS = -Ofast -Wall
 endif
+
+ifeq ($(PAR),1)
+	CFLAGS 	+= -fopenmp
+	SUFFIX	 = par
+else
+	CFLAGS 	+= -Wno-unknown-pragmas
+	SUFFIX	 = seq
+endif
+
 LDFLAGS = -lm
 
+BUILD_DIR  = build/$(BUILD)-$(SUFFIX)
+
 .PHONY: all debug clean
+
 
 all: $(BUILD_DIR)/$(TARGET)
 
