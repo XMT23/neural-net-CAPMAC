@@ -100,11 +100,14 @@ void forward_prop() {
                 // Acumulador perquè sinó no sé com paral·lelitzar el bucle
                 // WARN: Crec que no cal aquest "acumulador", però des de que
                 // el fem servir no hi ha errors per tant NO TOCAR!.
+                // CORRECTION si que cal.
+                //
                 double sum = lay[i].bias[j];
 
                 for (int k = 0; k < num_neurons[i - 1]; k++)
-                    lay[i].z[j] += lay[i - 1].out_weights[j * prev + k] 
+                    sum += lay[i - 1].out_weights[j * prev + k] 
                         * lay[i - 1].actv[k];
+                lay[i].z[j] = sum;
 
                 if (i < num_layers - 1)  // Relu Activation Function for Hidden Layers
                     lay[i].actv[j] = (sum < 0) ? 0 : sum;
@@ -251,7 +254,7 @@ void back_prop(int p) {
                 if (i == num_layers - 1) {
                     // El cas especial de la capa output (el mateix codi que el original)
                     double a = lay[i].actv[j];
-                    dz = (a - desired_outputs[p][j] * a * (1 - a));
+                    dz = (a - desired_outputs[p][j]) * a * (1 - a);
                 } else {
                     dz = (lay[i].z[j] >= 0) ? lay[i].dactv[j] : 0;
                 }
