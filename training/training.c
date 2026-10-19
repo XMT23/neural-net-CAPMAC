@@ -230,7 +230,6 @@ void back_prop(int p) {
     // NOTE: Aquesta és la millor solució que he trobat. Dividir el bucle en 2 "parts".
     //  Hi ha d'haver una solució millor i més elegant i potser aquesta no contempla segons quines
     //  situacion concretes. Tot i així, en general, funciona correctament.
-    //  PD: Aquesta solució està inspirada en un altre projecte, adaptat, que presenta un problema similar.
     //
     // TODO: Fer tests i proves per comprovar que, efectivament, aquesta és una solució vàlida!!
     
