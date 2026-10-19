@@ -19,6 +19,8 @@
 #include <stdio.h>
 #include <omp.h>
 
+// NOTE: Solució basada en la còpia de la meva màquina. Aquesta és la versió "final" (github).
+//  si no funciona bé al clúster, me l'envies al WhatsApp :D
 
 /**
  * @brief Inicialitza la capa incial de la xarxa (input layer) amb l'entrada
@@ -179,46 +181,96 @@ float compute_loss(int i) {
  *
  */
 void back_prop(int p) {
-    // Output Layer
-    for (int k = 0; k < num_neurons[num_layers - 2]; k++) 
-        lay[num_layers - 2].dactv[k] = 0;
+    // WARN: El problema principal és dactv[k]. A més al igual que a forward
+    // el primer bucle (el de i) no es pot paral·lelitzar (dependècia).
 
-    for (int j = 0; j < num_neurons[num_layers - 1]; j++) {
-        lay[num_layers - 1].dz[j] =
-            (lay[num_layers - 1].actv[j] - desired_outputs[p][j]) *
-            (lay[num_layers - 1].actv[j]) * (1 - lay[num_layers - 1].actv[j]);
-        lay[num_layers - 1].dbias[j] += lay[num_layers - 1].dz[j];
-    }
+    // // Output Layer
+    // for (int k = 0; k < num_neurons[num_layers - 2]; k++) 
+    //     lay[num_layers - 2].dactv[k] = 0;
+    //
+    // for (int j = 0; j < num_neurons[num_layers - 1]; j++) {
+    //     lay[num_layers - 1].dz[j] =
+    //         (lay[num_layers - 1].actv[j] - desired_outputs[p][j]) *
+    //         (lay[num_layers - 1].actv[j]) * (1 - lay[num_layers - 1].actv[j]);
+    //     lay[num_layers - 1].dbias[j] += lay[num_layers - 1].dz[j];
+    // }
+    //
+    // for (int j = 0; j < num_neurons[num_layers - 1]; j++) {
+    //     for (int k = 0; k < num_neurons[num_layers - 2]; k++) {
+    //         lay[num_layers - 2].dw[j * num_neurons[num_layers - 2] + k] +=
+    //             (lay[num_layers - 1].dz[j] * lay[num_layers - 2].actv[k]);
+    //         lay[num_layers - 2].dactv[k] +=          
+    //             lay[num_layers - 2].out_weights[j * num_neurons[num_layers - 2] + k] *
+    //             lay[num_layers - 1].dz[j];
+    //     }
+    // }
+    //
+    // // Hidden Layers
+    // for (int i = num_layers - 2; i > 0; i--) {
+    //     if ( i > 1 )
+    //         for (int k = 0; k < num_neurons[i - 1]; k++)
+    //             lay[i - 1].dactv[k] = 0;
+    //
+    //     for (int j = 0; j < num_neurons[i]; j++) {
+    //         lay[i].dz[j] = (lay[i].z[j] >= 0) ? lay[i].dactv[j] : 0;
+    //
+    //         for (int k = 0; k < num_neurons[i - 1]; k++) {
+    //             lay[i - 1].dw[j * num_neurons[i - 1] + k] +=
+    //                 lay[i].dz[j] * lay[i - 1].actv[k];
+    //
+    //             if (i > 1)
+    //                 lay[i - 1].dactv[k] +=
+    //                     lay[i - 1].out_weights[j * num_neurons[i - 1] + k] *
+    //                     lay[i].dz[j];
+    //         }
+    //         lay[i].dbias[j] += lay[i].dz[j];
+    //     }
+    // }
 
-    for (int j = 0; j < num_neurons[num_layers - 1]; j++) {
-        for (int k = 0; k < num_neurons[num_layers - 2]; k++) {
-            lay[num_layers - 2].dw[j * num_neurons[num_layers - 2] + k] +=
-                (lay[num_layers - 1].dz[j] * lay[num_layers - 2].actv[k]);
-            lay[num_layers - 2].dactv[k] +=          
-                lay[num_layers - 2].out_weights[j * num_neurons[num_layers - 2] + k] *
-                lay[num_layers - 1].dz[j];
-        }
-    }
+    // NOTE: Aquesta és la millor solució que he trobat. Dividir el bucle en 2 "parts".
+    //  Hi ha d'haver una solució millor i més elegant i potser aquesta no contempla segons quines
+    //  situacion concretes. Tot i així, en general, funciona correctament.
+    //  PD: Aquesta solució està inspirada en un altre projecte, adaptat, que presenta un problema similar.
+    //
+    // TODO: Fer tests i proves per comprovar que, efectivament, aquesta és una solució vàlida!!
+    
+    #pragma omp parallel
+    {
+        for (int i = num_layers - 1; i > 0; i--) {
+            int n_actual = num_neurons[i];
+            int n_anterior = num_neurons[i-1];
 
-    // Hidden Layers
-    for (int i = num_layers - 2; i > 0; i--) {
-        if ( i > 1 )
-            for (int k = 0; k < num_neurons[i - 1]; k++)
-                lay[i - 1].dactv[k] = 0;
+            // BUCLE 1
+            #pragma omp for schedule(static)
+            for (int j = 0; j < n_actual; j++) {
+                double dz;
 
-        for (int j = 0; j < num_neurons[i]; j++) {
-            lay[i].dz[j] = (lay[i].z[j] >= 0) ? lay[i].dactv[j] : 0;
+                if (i == num_layers - 1) {
+                    // El cas especial de la capa output (el mateix codi que el original)
+                    double a = lay[i].actv[j];
+                    dz = (a - desired_outputs[p][j] * a * (1 - a));
+                } else {
+                    dz = (lay[i].z[j] >= 0) ? lay[i].dactv[j] : 0;
+                }
 
-            for (int k = 0; k < num_neurons[i - 1]; k++) {
-                lay[i - 1].dw[j * num_neurons[i - 1] + k] +=
-                    lay[i].dz[j] * lay[i - 1].actv[k];
-
-                if (i > 1)
-                    lay[i - 1].dactv[k] +=
-                        lay[i - 1].out_weights[j * num_neurons[i - 1] + k] *
-                        lay[i].dz[j];
+                lay[i].dz[j] = dz;
+                lay[i].dbias[j] += dz;
+                for (int k = 0; k < n_anterior; k++) {
+                    lay[i - 1].dw[j * n_anterior + k] += dz * lay[i - 1].actv[k];
+                }
             }
-            lay[i].dbias[j] += lay[i].dz[j];
+
+            // BUCLE 2 (tots els dz's calculats)
+            if (i > 1) {
+                #pragma omp for schedule(static)
+                for (int k = 0; k < n_anterior; k++) {
+                    double suma = 0;
+                    for (int j = 0; j < n_actual; j++) {
+                        suma += lay[i - 1].out_weights[j * n_anterior + k] * lay[i].dz[j];
+                    }
+                    lay[i - 1].dactv[k] = suma;
+                }
+            }
         }
     }
 }
@@ -231,14 +283,28 @@ void back_prop(int p) {
  * @see back_prop
  */
 void update_weights(void) {
-    for (int i = 0; i < num_layers - 1; i++) {
-        for (int j = 0; j < num_neurons[i + 1]; j++)
-            for (int k = 0; k < num_neurons[i]; k++)  // Update Weights
-                lay[i].out_weights[j * num_neurons[i] + k] =
-                    (lay[i].out_weights[j * num_neurons[i] + k]) -
-                    (alpha * lay[i].dw[j * num_neurons[i] + k]);
+    #pragma omp parallel
+    {
+        for (int i = 0; i < num_layers - 1; i++) {
+            // WARN: Estem utilitzant un index més "natural" que el original
+            //
+            // for (int j = 0; j < num_neurons[i + 1]; j++) {
+            //     for (int k = 0; k < num_neurons[i]; k++ ) {  // Update Weights
+            //         lay[i].out_weights[j * num_neurons[i] + k] =
+            //             (lay[i].out_weights[j * num_neurons[i] + k]) -
+            //             (alpha * lay[i].dw[j * num_neurons[i] + k]);
+            //     }
+            // }
 
-        for (int j = 0; j < num_neurons[i]; j++)  // Update Bias
-            lay[i].bias[j] = lay[i].bias[j] - (alpha * lay[i].dbias[j]);
+            long n = (long)num_neurons[i + 1] * num_neurons[i];
+            
+            #pragma omp for schedule(static) nowait
+            for (int idx = 0; idx < n; idx++)
+                lay[i].out_weights[idx] -= alpha * lay[i].dw[idx];
+
+            #pragma omp for schedule(static) nowait
+            for (int j = 0; j < num_neurons[i]; j++)  // Update Bias
+                lay[i].bias[j] = lay[i].bias[j] - (alpha * lay[i].dbias[j]);
+        }
     }
 }
