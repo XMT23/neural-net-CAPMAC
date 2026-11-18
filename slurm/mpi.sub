@@ -1,0 +1,22 @@
+#!/bin/bash
+#SBATCH -N ${SLURM_JOB_NUM_NODES:-1}
+#SBATCH --ntasks-per-node=${NTASKS_PER_NODE:-12}
+#SBATCH --cpus-per-task=1
+#SBATCH --exclusive
+#SBATCH --partition=nodo.q
+#SBATCH --job-name=mpi_exec
+#SBATCH --output=results/output-%j.out
+#SBATCH --error=results/output-%j.err
+
+module add gcc/13.2.1
+
+BUILD=release
+TARGET=neural_net
+EXEC=build/$BUILD/$TARGET
+
+make clean
+make BUILD=$BUILD || exit 1
+
+mpirun -n $SLURM_NTASKS ./$EXEC configuration/configfile.txt
+
+make clean

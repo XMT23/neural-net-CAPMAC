@@ -1,11 +1,10 @@
-CC      = gcc
+CC      = mpicc
 TARGET  = neural_net
 
 SRC = $(shell find . -name '*.c' -not -path './build/*' | sed 's|^\./||')
 INC = $(addprefix -I,$(sort $(dir $(SRC))))
 
 # release default. "make debug" for debug
-PAR				?= 1
 BUILD     ?= release
 OBJ        = $(SRC:%.c=$(BUILD_DIR)/%.o)
 DEP        = $(OBJ:.o=.d)
@@ -16,17 +15,9 @@ else
     CFLAGS = -Ofast -Wall
 endif
 
-ifeq ($(PAR),1)
-	CFLAGS 	+= -fopenmp
-	SUFFIX	 = par
-else
-	CFLAGS 	+= -Wno-unknown-pragmas
-	SUFFIX	 = seq
-endif
-
 LDFLAGS = -lm
 
-BUILD_DIR  = build/$(BUILD)-$(SUFFIX)
+BUILD_DIR  = build/$(BUILD)
 
 .PHONY: all debug clean
 
