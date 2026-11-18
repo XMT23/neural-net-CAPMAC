@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH -N ${SLURM_JOB_NUM_NODES:-1}
-#SBATCH --ntasks-per-node=${NTASKS_PER_NODE:-12}
+#SBATCH -N 1
+#SBATCH --ntasks-per-node=12
 #SBATCH --cpus-per-task=1
 #SBATCH --exclusive
 #SBATCH --partition=nodo.q
