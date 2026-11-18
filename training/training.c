@@ -80,7 +80,7 @@ void init_deltas() {
  * cada neurona depén de l'exitació de la neurona calculada en el for més intern
  * (sobre k) [lay[i].z[j]]. El valor d'exitació s'inicialitza amb el biax de la
  * neurona corresponent [j] (lay[i].bias[j]) i es calcula multiplicant el valor
- *          d'activació de les neurones de la capa anterior (i-1) pels pesos de
+ * d'activació de les neurones de la capa anterior (i-1) pels pesos de
  * les connexions (out_weights) entre les dues capes. Finalment, el valor
  * d'activació de la neurona (j) es calcula fent servir la funció RELU
  * (REctified Linear Unit) si la capa (j) és una capa oculta (hidden) o la
