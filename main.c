@@ -95,7 +95,7 @@ void train_neural_net() {
     size_t buf_size = 0;
     for (int l = 0; l < num_layers - 1; l++) {
         buf_size += num_neurons[l + 1] * num_neurons[l];
-        buf_size += num_neurons[l];
+        buf_size += num_neurons[l + 1];
     }
     float *buf = malloc(buf_size * sizeof(float));
 
@@ -142,14 +142,13 @@ void train_neural_net() {
             }
 
             size_t offset = 0;
-
             for (int l = 0; l < num_layers - 1; l++) {
                 size_t nw = num_neurons[l + 1] * num_neurons[l];
-                size_t nb = num_neurons[l];
+                size_t nb = num_neurons[l + 1];
 
                 memcpy(buf + offset, lay[l].dw, nw * sizeof(float));
                 offset += nw;
-                memcpy(buf + offset, lay[l].dbias, nb * sizeof(float));
+                memcpy(buf + offset, lay[l + 1].dbias, nb * sizeof(float));
                 offset += nb;
             }
             MPI_Allreduce(MPI_IN_PLACE, buf, buf_size,
@@ -158,11 +157,11 @@ void train_neural_net() {
             offset = 0;
             for (int l = 0; l < num_layers - 1; l++) {
                 size_t nw = num_neurons[l + 1] * num_neurons[l];
-                size_t nb = num_neurons[l];
+                size_t nb = num_neurons[l + 1];
 
-                memcpy(lay[l].dw, buf + offset, nw + sizeof(float));
+                memcpy(lay[l].dw, buf + offset, nw * sizeof(float));
                 offset += nw;
-                memcpy(lay[l].dbias, buf + offset, nb + sizeof(float));
+                memcpy(lay[l + 1].dbias, buf + offset, nb * sizeof(float));
                 offset += nb;
             }
 
@@ -252,8 +251,13 @@ int main(int argc, char** argv) {
         exit(0);
     }
 
+    for (int l = 0; l < num_layers - 1; l++) {
+        int nw = num_neurons[l + 1] * num_neurons[l];
+        MPI_Bcast(lay[l].out_weights, nw, MPI_FLOAT, 0, MPI_COMM_WORLD);
+        MPI_Bcast(lay[l+1].bias, num_neurons[l+1], MPI_FLOAT, 0, MPI_COMM_WORLD);
+    }
+
     // Start measuring time
-    MPI_Barrier(MPI_COMM_WORLD);
     struct timeval begin;
     gettimeofday(&begin, 0);
 
