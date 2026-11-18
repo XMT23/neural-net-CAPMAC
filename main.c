@@ -183,6 +183,11 @@ int main(int argc, char** argv) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
+
+    if (rank == 0) {
+        printf("Number of processes: %d\n", size);
+    }
+
     if (debug == 1)
         printf("argc = %d \n", argc);
     if (argc <= 1)
