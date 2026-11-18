@@ -110,7 +110,8 @@ void train_neural_net() {
             // Calculem quina part del batch fa cada procés
             int low = nb * batch_size + rank * batch_size / size;
             int high = nb * batch_size + (rank + 1) * batch_size / size;
-            for (int i = nb*batch_size; i < (nb+1)*batch_size; i++) {
+            // for (int i = nb*batch_size; i < (nb+1)*batch_size; i++) {
+            for (int i = low; i < high; i++) {
                 int p = ranpat[i];
                 feed_input(p);
                 forward_prop();
@@ -209,7 +210,7 @@ int main(int argc, char** argv) {
     test_nn();
 
     // Stop measuring time and calculate the elapsed time
-    double elapsed;
+    double elapsed = 0.0;
     if (rank == 0) {
         elapsed = elapsedT(begin);
         printf("TRAIN_TIME=%f", elapsed);

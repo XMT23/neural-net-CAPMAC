@@ -12,7 +12,7 @@ DEP        = $(OBJ:.o=.d)
 ifeq ($(BUILD),debug)
     CFLAGS = -O0 -g -Wall -Wextra -DDEBUG
 else
-    CFLAGS = -Ofast -Wall
+    CFLAGS = -Ofast -Wall -Wextra
 endif
 
 LDFLAGS = -lm
