@@ -119,7 +119,7 @@ void train_neural_net() {
         }
         MPI_Bcast(ranpat, num_training_patterns, MPI_INT, 0, MPI_COMM_WORLD);
 
-        for (int nb = 0; nb < num_training_patterns/batch_size; nb++) {
+        for (int nb = 0; nb < n_batches; nb++) {
             // Calculem quina part del batch fa cada procés
             int bstart = nb * batch_size;
             int current_bsize = num_training_patterns - bstart;
