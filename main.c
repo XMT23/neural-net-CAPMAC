@@ -79,7 +79,9 @@ void train_neural_net() {
 
     if ((input = loadPatternSet(num_training_patterns, dataset_training_path,
                                 1)) == NULL) {
-        printf("Loading Patterns: Error!!\n");
+        if (rank == 0) {
+            printf("Loading Patterns: Error!!\n");
+        }
         MPI_Abort(MPI_COMM_WORLD, -1);
     }
 
@@ -88,61 +90,107 @@ void train_neural_net() {
     for (int p = 0; p < num_training_patterns; p++)
         ranpat[p] = p;
 
-    // NOTE: Per seguretat, farem aquest barrier
-    MPI_Barrier(MPI_COMM_WORLD);
-    // Gradient Descent
+    int n_batches = (num_training_patterns + batch_size - 1) / batch_size;
+
+    size_t buf_size = 0;
+    for (int l = 0; l < num_layers - 1; l++) {
+        buf_size += num_neurons[l + 1] * num_neurons[l];
+        buf_size += num_neurons[l];
+    }
+    float *buf = malloc(buf_size * sizeof(float));
+
     struct timeval now;
-    gettimeofday(&now, 0);
+    if (rank == 0) {
+        gettimeofday(&now, 0);
+    }
+
+    // Gradient Descent
     for (int it = 0; it < num_epochs; it++) {
-        float loss = 0;
+        float local_loss = 0;
         // Train patterns randomly
-        for (int p = 0; p < num_training_patterns; p++) {
-            int x = rando();
-            int np = (x * x) % num_training_patterns;
-            int op = ranpat[p];
-            ranpat[p] = ranpat[np];
-            ranpat[np] = op;
+        if (rank == 0) {
+            for (int p = 0; p < num_training_patterns; p++) {
+                int x = rando();
+                int np = (x * x) % num_training_patterns;
+                int op = ranpat[p];
+                ranpat[p] = ranpat[np];
+                ranpat[np] = op;
+            }
         }
+        MPI_Bcast(ranpat, num_training_patterns, MPI_INT, 0, MPI_COMM_WORLD);
 
         for (int nb = 0; nb < num_training_patterns/batch_size; nb++) {
+            // Calculem quina part del batch fa cada procés
+            int bstart = nb * batch_size;
+            int current_bsize = num_training_patterns - bstart;
+            if (current_bsize > batch_size) {
+                current_bsize = batch_size;
+            }
+
+            int low = bstart + current_bsize * rank / size;
+            int high = bstart + current_bsize * (rank + 1) / size;
+
             init_deltas();
 
-            // Calculem quina part del batch fa cada procés
-            int low = nb * batch_size + rank * batch_size / size;
-            int high = nb * batch_size + (rank + 1) * batch_size / size;
             // for (int i = nb*batch_size; i < (nb+1)*batch_size; i++) {
             for (int i = low; i < high; i++) {
                 int p = ranpat[i];
                 feed_input(p);
                 forward_prop();
-                loss += compute_loss(p);
+                local_loss += compute_loss(p);
                 back_prop(p);
             }
-            
-            for (int l = 0; l < num_layers - 1; l++) {
-                int n = (long)num_neurons[l + 1] * num_neurons[l];
-                float *buf = malloc(n * sizeof(float));
-                MPI_Allreduce(lay[l].dw, buf, n, MPI_FLOAT,
-                        MPI_SUM, MPI_COMM_WORLD);
-                memcpy(lay[l].dw, buf, n * sizeof(float));
-                free(buf);
 
-                buf = malloc(num_neurons[l] * sizeof(float));
-                MPI_Allreduce(lay[l].dbias, buf, num_neurons[l], MPI_FLOAT,
-                        MPI_SUM, MPI_COMM_WORLD);
-                memcpy(lay[l].dbias, buf, num_neurons[l] * sizeof(float));
-                free(buf);
+            size_t offset = 0;
+
+            for (int l = 0; l < num_layers - 1; l++) {
+                size_t nw = num_neurons[l + 1] * num_neurons[l];
+                size_t nb = num_neurons[l];
+
+                memcpy(buf + offset, lay[l].dw, nw * sizeof(float));
+                offset += nw;
+                memcpy(buf + offset, lay[l].dbias, nb * sizeof(float));
+                offset += nb;
             }
+            MPI_Allreduce(MPI_IN_PLACE, buf, buf_size,
+                    MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+
+            offset = 0;
+            for (int l = 0; l < num_layers - 1; l++) {
+                size_t nw = num_neurons[l + 1] * num_neurons[l];
+                size_t nb = num_neurons[l];
+
+                memcpy(lay[l].dw, buf + offset, nw + sizeof(float));
+                offset += nw;
+                memcpy(lay[l].dbias, buf + offset, nb + sizeof(float));
+                offset += nb;
+            }
+
+            // for (int l = 0; l < num_layers - 1; l++) {
+            //
+            //     int n = (long)num_neurons[l + 1] * num_neurons[l];
+            //     float *bufdw = malloc(n * sizeof(float));
+            //     float *bufbias = malloc(num_neurons[l] * sizeof(float));
+            //     MPI_Allreduce(lay[l].dw, bufdw, n, MPI_FLOAT,
+            //             MPI_SUM, MPI_COMM_WORLD);
+            //     memcpy(lay[l].dw, bufdw, n * sizeof(float));
+            //
+            //     MPI_Allreduce(lay[l].dbias, buf, num_neurons[l], MPI_FLOAT,
+            //             MPI_SUM, MPI_COMM_WORLD);
+            //     memcpy(lay[l].dbias, buf, num_neurons[l] * sizeof(float));
+            //     free(buf);
+            // }
             update_weights();
         }
 
-        float loss_total = 0;
-        MPI_Reduce(&loss, &loss_total, 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+        float loss_total = 0.0f;
+        MPI_Reduce(&local_loss, &loss_total, 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
         if (rank == 0) {
             printf("Epoch %d Loss: %f\n", it, loss_total/num_training_patterns);
         }
     }
-    MPI_Barrier(MPI_COMM_WORLD);
+
+    free(buf);
     freeInput(num_training_patterns, input);
 }
 
@@ -188,14 +236,14 @@ int main(int argc, char** argv) {
         printf("Number of processes: %d\n", size);
     }
 
-    if (debug == 1)
+    if (debug == 1 && rank == 0)
         printf("argc = %d \n", argc);
     if (argc <= 1)
         readConfiguration("configuration/configfile.txt");
     else
         readConfiguration(argv[1]);
 
-    if (debug == 1)
+    if (debug == 1 && rank == 0)
         printf("FINISH CONFIG \n");
 
     // Initialize the neural network module
@@ -205,6 +253,7 @@ int main(int argc, char** argv) {
     }
 
     // Start measuring time
+    MPI_Barrier(MPI_COMM_WORLD);
     struct timeval begin;
     gettimeofday(&begin, 0);
 
