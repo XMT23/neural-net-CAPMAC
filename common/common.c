@@ -24,6 +24,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+int rank, size;
+
 char* readImg(FILE* fd) {
     char* img;
     img = (char*)malloc(img_dim_x * img_dim_y);

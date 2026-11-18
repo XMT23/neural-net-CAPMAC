@@ -18,12 +18,15 @@
  */
 
 #include "main.h"
+#include "common/common.h"
+#include "initialize/initialize.h"
 
 #include <fcntl.h>
 #include <limits.h>
-#include <math.h>
 #include <stdio.h>
+#include <mpi.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/time.h>
 
 //-----------FREE INPUT------------
@@ -70,12 +73,14 @@ void printRecognized(int p, layer Output) {
  *
  */
 void train_neural_net() {
-    printf("\nTraining...\n");
+    if (rank == 0) {
+        printf("\nTraining...\n");
+    }
 
     if ((input = loadPatternSet(num_training_patterns, dataset_training_path,
                                 1)) == NULL) {
         printf("Loading Patterns: Error!!\n");
-        exit(-1);
+        MPI_Abort(MPI_COMM_WORLD, -1);
     }
 
     int ranpat[num_training_patterns];
@@ -83,9 +88,11 @@ void train_neural_net() {
     for (int p = 0; p < num_training_patterns; p++)
         ranpat[p] = p;
 
+    // NOTE: Per seguretat, farem aquest barrier
+    MPI_Barrier(MPI_COMM_WORLD);
     // Gradient Descent
-    // struct timeval now;
-    // gettimeofday(&now, 0);
+    struct timeval now;
+    gettimeofday(&now, 0);
     for (int it = 0; it < num_epochs; it++) {
         float loss = 0;
         // Train patterns randomly
@@ -99,22 +106,42 @@ void train_neural_net() {
 
         for (int nb = 0; nb < num_training_patterns/batch_size; nb++) {
             init_deltas();
+
+            // Calculem quina part del batch fa cada procés
+            int low = nb * batch_size + rank * batch_size / size;
+            int high = nb * batch_size + (rank + 1) * batch_size / size;
             for (int i = nb*batch_size; i < (nb+1)*batch_size; i++) {
                 int p = ranpat[i];
-
                 feed_input(p);
                 forward_prop();
                 loss += compute_loss(p);
                 back_prop(p);
             }
+            
+            for (int l = 0; l < num_layers - 1; l++) {
+                int n = (long)num_neurons[l + 1] * num_neurons[l];
+                float *buf = malloc(n * sizeof(float));
+                MPI_Allreduce(lay[l].dw, buf, n, MPI_FLOAT,
+                        MPI_SUM, MPI_COMM_WORLD);
+                memcpy(lay[l].dw, buf, n * sizeof(float));
+                free(buf);
+
+                buf = malloc(num_neurons[l] * sizeof(float));
+                MPI_Allreduce(lay[l].dbias, buf, num_neurons[l], MPI_FLOAT,
+                        MPI_SUM, MPI_COMM_WORLD);
+                memcpy(lay[l].dbias, buf, num_neurons[l] * sizeof(float));
+                free(buf);
+            }
             update_weights();
         }
 
-        printf("Epoch %d Loss: %f\n", it, loss/num_training_patterns);
-        if (debug == 1) getchar();
+        float loss_total = 0;
+        MPI_Reduce(&loss, &loss_total, 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+        if (rank == 0) {
+            printf("Epoch %d Loss: %f\n", it, loss_total/num_training_patterns);
+        }
     }
-    // double elapsed = elapsedT(now);
-    // printf("TRAIN_TIME=%f", elapsed);
+    MPI_Barrier(MPI_COMM_WORLD);
     freeInput(num_training_patterns, input);
 }
 
@@ -122,15 +149,18 @@ void train_neural_net() {
 void test_nn() {
     char** rSet;
 
-    printf("\nTesting...\n");
+    if (rank == 0) {
+        printf("\nTesting...\n");
+    }
 
     if ((rSet = loadPatternSet(num_test_patterns, dataset_test_path, 0)) ==
         NULL) {
         printf("Error!!\n");
-        exit(-1);
+        MPI_Abort(MPI_COMM_WORLD, -1);
     }
 
-    for (int i = 0; i < num_test_patterns; i++) {
+    total = 0;
+    for (int i = rank; i < num_test_patterns; i += size) {
         for (int j = 0; j < num_neurons[0]; j++)
             lay[0].actv[j] = rSet[i][j];
 
@@ -138,12 +168,20 @@ void test_nn() {
         printRecognized(i, lay[num_layers - 1]);
     }
 
-    printf("\nTotal encerts = %d (/%d) \n", total, num_test_patterns);
+    int total_global = 0;
+    MPI_Reduce(&total, &total_global, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+    if (rank == 0) {
+        printf("\nTotal encerts = %d (/%d) \n", total_global, num_test_patterns);
+    }
     freeInput(num_test_patterns, rSet);
 }
 
 //-----------MAIN-----------//
 int main(int argc, char** argv) {
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
     if (debug == 1)
         printf("argc = %d \n", argc);
     if (argc <= 1)
@@ -171,13 +209,19 @@ int main(int argc, char** argv) {
     test_nn();
 
     // Stop measuring time and calculate the elapsed time
-    double elapsed = elapsedT(begin);
-    printf("TRAIN_TIME=%f", elapsed);
+    double elapsed;
+    if (rank == 0) {
+        elapsed = elapsedT(begin);
+        printf("TRAIN_TIME=%f", elapsed);
+    }
 
     if (dinit() != SUCCESS_DINIT)
-        printf("Error in Dinitialization...\n");
+        printf("Error in Dinitialization (rank %d)...\n", rank);
 
-    printf("\n\nGoodbye! (%f sec)\n\n", elapsed);
+    if (rank == 0) {
+        printf("\n\nGoodbye! (%f sec)\n\n", elapsed);
+    }
 
+    MPI_Finalize();
     return 0;
 }

@@ -16,6 +16,7 @@
 
 extern int batch_size;  // Patrons per batch
 
+extern int rank, size;
 extern float** desired_outputs;
 extern int* Validation;
 
