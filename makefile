@@ -18,7 +18,7 @@ else
 endif
 
 ifeq($(COMM_EPOCH),1)
-	CFLAGS += -DCOMM_EPOCH
+    CFLAGS += -DCOMM_EPOCH
 endif
 
 LDFLAGS = -lm
