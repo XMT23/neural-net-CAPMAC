@@ -190,20 +190,6 @@ void train_neural_net() {
         if (rank == 0) {
             printf("Epoch %d Loss: %f\n", it, global_loss / num_training_patterns);
         }
-            // for (int l = 0; l < num_layers - 1; l++) {
-            //
-            //     int n = (long)num_neurons[l + 1] * num_neurons[l];
-            //     float *bufdw = malloc(n * sizeof(float));
-            //     float *bufbias = malloc(num_neurons[l] * sizeof(float));
-            //     MPI_Allreduce(lay[l].dw, bufdw, n, MPI_FLOAT,
-            //             MPI_SUM, MPI_COMM_WORLD);
-            //     memcpy(lay[l].dw, bufdw, n * sizeof(float));
-            //
-            //     MPI_Allreduce(lay[l].dbias, buf, num_neurons[l], MPI_FLOAT,
-            //             MPI_SUM, MPI_COMM_WORLD);
-            //     memcpy(lay[l].dbias, buf, num_neurons[l] * sizeof(float));
-            //     free(buf);
-            // }
     }
     MPI_Barrier(MPI_COMM_WORLD);
     freeInput(num_training_patterns, input);
