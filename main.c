@@ -91,6 +91,7 @@ void train_neural_net() {
     for (int p = 0; p < num_training_patterns; p++)
         ranpat[p] = p;
 
+    MPI_Barrier(MPI_COMM_WORLD);
     struct timeval now;
     if (rank == 0) {
         gettimeofday(&now, 0);
@@ -131,8 +132,12 @@ void train_neural_net() {
                 }
                 update_weights();
         }
-        MPI_Barrier(MPI_COMM_WORLD);
-        freeInput(num_training_patterns, input);
+        global_loss = 0;
+        MPI_Reduce(&local_loss, &global_loss, 1,
+                MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+        if (rank == 0) {
+            printf("Epoch %d Loss: %f\n", it, global_loss / num_training_patterns);
+        }
             // for (int l = 0; l < num_layers - 1; l++) {
             //
             //     int n = (long)num_neurons[l + 1] * num_neurons[l];
@@ -148,6 +153,8 @@ void train_neural_net() {
             //     free(buf);
             // }
     }
+    MPI_Barrier(MPI_COMM_WORLD);
+    freeInput(num_training_patterns, input);
 }
 
 //-----------TEST THE TRAINED NETWORK------------
