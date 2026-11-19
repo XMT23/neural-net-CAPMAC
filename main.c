@@ -136,15 +136,30 @@ void train_neural_net() {
         for (int l = 0; l < num_layers; l++) {
             if (l < num_layers - 1) {
                 long nw = (long)num_neurons[l + 1] * num_neurons[l];
-                for (long k = 0; k < nw; k++) lay[l].out_weights[k] *= my_w;
+                for (long k = 0; k < nw; k++) {
+                    lay[l].out_weights[k] *= my_w;
+                }
+
                 MPI_Allreduce(MPI_IN_PLACE, lay[l].out_weights, (int)nw,
                         MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
-                for (long k = 0; k < nw; k++) lay[l].out_weights[k] /= nbatches;
+
+                for (long k = 0; k < nw; k++) {
+                    lay[l].out_weights[k] /= nbatches;
+                }
             }
-            for (int k = 0; k < num_neurons[l]; k++) lay[l].bias[k] *= my_w;
-            MPI_Allreduce(MPI_IN_PLACE, lay[l].bias, num_neurons[l],
-                    MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
-            for (int k = 0; k < num_neurons[l]; k++) lay[l].bias[k] /= nbatches;
+
+            if (l > 0) {
+                for (int k = 0; k < num_neurons[l]; k++) {
+                    lay[l].bias[k] *= my_w;
+                }
+
+                MPI_Allreduce(MPI_IN_PLACE, lay[l].bias, num_neurons[l],
+                        MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+
+                for (int k = 0; k < num_neurons[l]; k++) {
+                    lay[l].bias[k] /= nbatches;
+                }
+            }
         }
 #else
         for (int nb = 0; nb < num_training_patterns / batch_size; nb++) {
