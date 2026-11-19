@@ -20,6 +20,7 @@
 #include "main.h"
 #include "common/common.h"
 #include "initialize/initialize.h"
+#include "training/training.h"
 
 #include <fcntl.h>
 #include <limits.h>
@@ -90,15 +91,6 @@ void train_neural_net() {
     for (int p = 0; p < num_training_patterns; p++)
         ranpat[p] = p;
 
-    int n_batches = (num_training_patterns + batch_size - 1) / batch_size;
-
-    size_t buf_size = 0;
-    for (int l = 0; l < num_layers - 1; l++) {
-        buf_size += num_neurons[l + 1] * num_neurons[l];
-        buf_size += num_neurons[l + 1];
-    }
-    float *buf = malloc(buf_size * sizeof(float));
-
     struct timeval now;
     if (rank == 0) {
         gettimeofday(&now, 0);
@@ -107,64 +99,40 @@ void train_neural_net() {
     // Gradient Descent
     for (int it = 0; it < num_epochs; it++) {
         float local_loss = 0;
-        // Train patterns randomly
-        if (rank == 0) {
-            for (int p = 0; p < num_training_patterns; p++) {
-                int x = rando();
-                int np = (x * x) % num_training_patterns;
-                int op = ranpat[p];
-                ranpat[p] = ranpat[np];
-                ranpat[np] = op;
-            }
+        float global_loss = 0;
+
+
+        for (int p = 0; p < num_training_patterns; p++) {
+            int x = rando();
+            int np = (x * x) % num_training_patterns;
+            int op = ranpat[p];
+            ranpat[p] = ranpat[np];
+            ranpat[np] = op;
         }
-        MPI_Bcast(ranpat, num_training_patterns, MPI_INT, 0, MPI_COMM_WORLD);
 
-        for (int nb = 0; nb < n_batches; nb++) {
-            // Calculem quina part del batch fa cada procés
-            int bstart = nb * batch_size;
-            int current_bsize = num_training_patterns - bstart;
-            if (current_bsize > batch_size) {
-                current_bsize = batch_size;
-            }
+        for (int nb = 0; nb < num_training_patterns / batch_size; nb++) {
+                init_deltas();
 
-            int low = bstart + current_bsize * rank / size;
-            int high = bstart + current_bsize * (rank + 1) / size;
+                int lo = nb * batch_size + rank * batch_size / size;
+                int hi = nb * batch_size + (rank+1) * batch_size / size;
+                for (int i = lo; i < hi; i++) {
+                    int p = ranpat[i];
+                    feed_input(p);
+                    forward_prop();
+                    local_loss += compute_loss(p);
+                    back_prop(p);
+                }
 
-            init_deltas();
-
-            // for (int i = nb*batch_size; i < (nb+1)*batch_size; i++) {
-            for (int i = low; i < high; i++) {
-                int p = ranpat[i];
-                feed_input(p);
-                forward_prop();
-                local_loss += compute_loss(p);
-                back_prop(p);
-            }
-
-            size_t offset = 0;
-            for (int l = 0; l < num_layers - 1; l++) {
-                size_t nw = num_neurons[l + 1] * num_neurons[l];
-                size_t nb = num_neurons[l + 1];
-
-                memcpy(buf + offset, lay[l].dw, nw * sizeof(float));
-                offset += nw;
-                memcpy(buf + offset, lay[l + 1].dbias, nb * sizeof(float));
-                offset += nb;
-            }
-            MPI_Allreduce(MPI_IN_PLACE, buf, buf_size,
-                    MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
-
-            offset = 0;
-            for (int l = 0; l < num_layers - 1; l++) {
-                size_t nw = num_neurons[l + 1] * num_neurons[l];
-                size_t nb = num_neurons[l + 1];
-
-                memcpy(lay[l].dw, buf + offset, nw * sizeof(float));
-                offset += nw;
-                memcpy(lay[l + 1].dbias, buf + offset, nb * sizeof(float));
-                offset += nb;
-            }
-
+                for (int l = 0; l < num_layers - 1; l++) {
+                    MPI_Allreduce(MPI_IN_PLACE, lay[l].dw, num_neurons[l + 1] * num_neurons[l],
+                            MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+                    MPI_Allreduce(MPI_IN_PLACE, lay[l].dbias, num_neurons[l],
+                            MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+                }
+                update_weights();
+        }
+        MPI_Barrier(MPI_COMM_WORLD);
+        freeInput(num_training_patterns, input);
             // for (int l = 0; l < num_layers - 1; l++) {
             //
             //     int n = (long)num_neurons[l + 1] * num_neurons[l];
@@ -179,18 +147,7 @@ void train_neural_net() {
             //     memcpy(lay[l].dbias, buf, num_neurons[l] * sizeof(float));
             //     free(buf);
             // }
-            update_weights();
-        }
-
-        float loss_total = 0.0f;
-        MPI_Reduce(&local_loss, &loss_total, 1, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-        if (rank == 0) {
-            printf("Epoch %d Loss: %f\n", it, loss_total/num_training_patterns);
-        }
     }
-
-    free(buf);
-    freeInput(num_training_patterns, input);
 }
 
 //-----------TEST THE TRAINED NETWORK------------
@@ -268,9 +225,8 @@ int main(int argc, char** argv) {
     test_nn();
 
     // Stop measuring time and calculate the elapsed time
-    double elapsed = 0.0;
+    double elapsed = elapsedT(begin);
     if (rank == 0) {
-        elapsed = elapsedT(begin);
         printf("TRAIN_TIME=%f", elapsed);
     }
 
