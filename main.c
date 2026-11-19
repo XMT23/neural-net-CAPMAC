@@ -96,6 +96,7 @@ void train_neural_net() {
 #ifdef COMM_EPOCH
     int b_lo = rank *nbatches / size;
     int b_hi = (rank + 1) * nbatches / size;
+    float my_w = (float)(b_hi - b_lo);
 #endif
 
     MPI_Barrier(MPI_COMM_WORLD);
