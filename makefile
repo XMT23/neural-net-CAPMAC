@@ -17,7 +17,7 @@ else
     CFLAGS = -Ofast -Wall -Wextra
 endif
 
-ifeq($(COMM_EPOCH),1)
+ifeq ($(COMM_EPOCH),1)
     CFLAGS += -DCOMM_EPOCH
 endif
 
