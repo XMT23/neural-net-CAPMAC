@@ -91,6 +91,13 @@ void train_neural_net() {
     for (int p = 0; p < num_training_patterns; p++)
         ranpat[p] = p;
 
+    int nbatches = num_training_patterns / batch_size;
+
+#ifdef COMM_EPOCH
+    int b_lo = rank *nbatches / size;
+    int b_hi = (rank + 1) * nbatches / size;
+#endif
+
     MPI_Barrier(MPI_COMM_WORLD);
     struct timeval now;
     if (rank == 0) {
@@ -111,6 +118,34 @@ void train_neural_net() {
             ranpat[np] = op;
         }
 
+#ifdef COMM_EPOCH
+        for (int nb = b_lo; nb < b_hi; nb++) {
+            init_deltas();
+            for (int i = nb*batch_size; i < (nb + 1) * batch_size; i++) {
+                int p = ranpat[i];
+                feed_input(p);
+                forward_prop();
+                local_loss += compute_loss(p);
+                back_prop(p);
+            }
+            update_weights();
+        }
+
+        // Only comm
+        for (int l = 0; l < num_layers; l++) {
+            if (l < num_layers - 1) {
+                long nw = (long)num_neurons[l + 1] * num_neurons[l];
+                for (long k = 0; k < nw; k++) lay[l].out_weights[k] *= my_w;
+                MPI_Allreduce(MPI_IN_PLACE, lay[l].out_weights, (int)nw,
+                        MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+                for (long k = 0; k < nw; k++) lay[l].out_weights[k] /= nbatches;
+            }
+            for (int k = 0; k < num_neurons[l]; k++) lay[l].bias[k] *= my_w;
+            MPI_Allreduce(MPI_IN_PLACE, lay[l].bias, num_neurons[l],
+                    MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+            for (int k = 0; k < num_neurons[l]; k++) lay[l].bias[k] /= nbatches;
+        }
+#else
         for (int nb = 0; nb < num_training_patterns / batch_size; nb++) {
                 init_deltas();
 
@@ -132,6 +167,7 @@ void train_neural_net() {
                 }
                 update_weights();
         }
+#endif
         global_loss = 0;
         MPI_Reduce(&local_loss, &global_loss, 1,
                 MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);

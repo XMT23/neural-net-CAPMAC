@@ -1,0 +1,23 @@
+#!/bin/bash
+#SBATCH -N 1
+#SBATCH --ntasks-per-node=4
+#SBATCH --cpus-per-task=1
+#SBATCH --exclusive
+#SBATCH --partition=nodo.q
+#SBATCH --job-name=mpi_exec
+#SBATCH --output=results/output-%j.out
+#SBATCH --error=results/output-%j.err
+
+module add openmpi/4.1.1
+module add gcc/13.2.1
+
+BUILD=release
+TARGET=neural_net
+EXEC=build/$BUILD/$TARGET
+
+make clean
+make BUILD=$BUILD COMM_EPOCH=1 || exit 1
+
+mpirun -n 4 ./$EXEC configuration/configfile.txt
+
+make clean

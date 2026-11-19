@@ -9,10 +9,16 @@ BUILD     ?= release
 OBJ        = $(SRC:%.c=$(BUILD_DIR)/%.o)
 DEP        = $(OBJ:.o=.d)
 
+COMM_EPOCH ?= 0
+
 ifeq ($(BUILD),debug)
     CFLAGS = -O0 -g -Wall -Wextra -DDEBUG
 else
     CFLAGS = -Ofast -Wall -Wextra
+endif
+
+ifeq($(COMM_EPOCH),1)
+	CFLAGS += -DCOMM_EPOCH
 endif
 
 LDFLAGS = -lm
